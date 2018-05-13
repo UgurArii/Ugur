@@ -3,144 +3,190 @@
 session_start();
 
 //sunucu bağlantısı ve veritabanı seçimi
-require_once 'includes/connection.php';
-                                             
+require_once '../../includes/connection.php';
+
 //form fonksiyonları 
-require_once 'includes/functions.php';
+require_once '../../includes/functions.php';
 
-if(isset($_POST['uyeGirisSubmit']))
-{
-
-/*    echo "form gönderildi .<br>";
-        echo "<pre>";
-    print_r($_POST);
-    echo "</pre>";    
-    
-exit();
-
-  [KullaniciAdi] => rcegitim
-    [Eposta] => iletisim@rcegitim.com
-    [Parola] => 123456
-    [uyeGirisSubmit] => Giriş Yap*/
-    
-    //formdan gelen değerle alınır
-    $kullaniciAdi = postValues($_POST['KullaniciAdi']);
-    $eposta = postValues($_POST['Eposta']);
-    $parola = postValues($_POST['Parola']);
-    $parola = md5($parola);
-    
-    
-    //değerler veritabanında kontrol edilir
-    $query_UyeVarmi = "SELECT * FROM uye WHERE
-          KullaniciAdi = '$kullaniciAdi' AND
-          Eposta = '$eposta' AND
-          Parola =  '$parola'
-
-        ";
-    ///echo $query_UyeVarmi;
-    //exit();
-    $result = mysql_query($query_UyeVarmi);
-    $row_rsUye = mysql_fetch_object($result);
-    $row_UyeVarmi = mysql_num_rows($result);
-    
-    echo $row_UyeVarmi;
-    
-    if($row_UyeVarmi==0){
+     //giriş yapılmışmı kontrol ediliyor
+     if(!GirisVarmi()){
+            header("Location:../index.php?Hata=GirisYap");
+        }
         
-       // echo "üye yok geri dön <br>";
-        header("Location:index.php?Hata=GirisBasarisiz");
+        //giriş yapılmış ise
+            $uyeID = $_SESSION['Uye']['UyeID'];
+        $modulID = 11;
+        $alan = 'Duzenle';
+             if(!yetkiVarmi($_SESSION['Uye']['SeviyeID'],4,$uyeID,$modulID,$alan)){
+            header("Location:../index.php?Hata=YetkisizGiris");      
+            }
         
-    }elseif($row_UyeVarmi==1){
+        //modül kayıt setinin oluşturulması
+        $query_rsModul = "SELECT * FROM modul ORDER BY ModulSira , ModulEklemeTarih ASC";
+        $rsModul = mysql_query($query_rsModul);
+        $row_rsModul = mysql_fetch_object($rsModul);
+        $num_row_rsModul = mysql_num_rows($rsModul);
         
-                
-        //echo "üye var giriş yapılacak <br>";
-        $_SESSION['Uye']['KullaniciAdi'] = $kullaniciAdi;
-        $_SESSION['Uye']['Eposta'] = $eposta;
-        $_SESSION['Uye']['UyeID'] = $row_rsUye->UyeID;
-        $_SESSION['Uye']['SeviyeID'] = $row_rsUye->SeviyeID;
-          
-        $uyeID =  $_SESSION['Uye']['UyeID'];
-        //giriş tablosuna değerleri girilecek
-        $girisIP = $_SERVER['REMOTE_ADDR'];
-        
-      $query_UyeGiris = "INSERT INTO uye_giris (UyeID,GirisIP) VALUES ('$uyeID','$girisIP')"; 
-      $sonuc = mysql_query($query_UyeGiris);
-      
-      if ($sonuc) {
-    header("Location:yonetim/index.php");
-}
-        
-    }
-    
-    
-    
-    //kontorl başarılı ise session'da KullaniciAdi, Eposta ve UyeID ve SeviyeID
-    
-    
-    //session işlemlerinden sonra ise yönetim index sayfasına geçilir
-    
-
-
-}
-
-
-
+                        $uyeSeviyeID = $_SESSION['Uye']['SeviyeID'];
+                       $uyeBarID =  $_SESSION['Uye']['UyeID'];
+                    //modül kayıt seti
+        $query_rsModulBar = "SELECT ModulAdi,ModulDizin,ModulResim FROM modul WHERE ModulAktif=1 AND ModulSeviye >= $uyeSeviyeID  AND ModulID!=1 AND ModulID!=17  AND ModulID IN (SELECT ModulID FROM modul_uye WHERE UyeID='$uyeBarID') ORDER BY ModulSira ASC";
+     
+       // echo $query_rsModul;
+        $rsModulBar = mysql_query($query_rsModulBar);
+        $row_rsModulBar = mysql_fetch_object($rsModulBar);
+        $num_row_rsModulBar = mysql_num_rows($rsModulBar);
+        $num_row_rsModul = mysql_num_rows($rsModul);
 ?>
 <!DOCTYPE html>
 <html>
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <title>Stok Yönetimi Modülleri</title>
         
-    <title>Arı Stok Yönetim Paneline Hoşgeldiniz</title>
-      <link href="includes/css/style.css" rel="stylesheet" type="text/css"/>
+        <script src="../../includes/jquery-1.8.2.min.js" type="text/javascript"></script>
+    <script type="text/javascript">
+$(function(){
     
-</head>
-<body>
-<div id="girisResim" ><img src="includes/img/loginHeaderIcon.png" />
+    //css özellikleri even, çift, veya odd tek olan satırlara uygulanacak
+    $("#ModulListe  tr.listeVeri:even").addClass("evenTR");
+    $("#ModulListe  tr.listeVeri:odd").addClass("oddTR");
+    //satırın üzerine gelince highlight effecti uygulanacak
     
-       <h1>Stok Yönetim Paneline Hoşgeldiniz</h1>
+    $("#ModulListe tr.listeVeri").hover(
+            function(){
+                $(this).toggleClass("highlightTR");
+                
+                
+            },
+            function(){               
+                
+                 $(this).toggleClass("highlightTR");
+                
+            }
 
-            <div id="girisBilgi">
-        <?php  
-        if(isset($_GET['Hata']))
-{
-            $hata= getValues($_GET['Hata']);
+
+);
+    
+    
+    
+});    
+
+    
+</script>
+    <style>
+        .evenTR {
+            background-color: #edf4f6;
             
-            if($hata=='GirisBasarisiz') {
+        }
+        .oddTR{
+            background-color: #ccf0f9;
                 
-                echo "<p><strong>Kullanıcı adınızı ,Eposta Adresinizi veya Parolanızı kontrol ediniz. </strong></p>";
+            
+            
+        }
+        .highlightTR{
+            
+            background-color: #f1fde3;
+            cursor: pointer;
+            
+        }
+        #ModulListe tr th {
+            
+            background-color: #f00;
+            color: #fff;
+            padding:5px;
+            text-align: left;
+            
+        }
                 
-            }    elseif ($hata=='GirisYap') {
-                
-                echo "<p><strong>Lütfen giriş yapınız.</strong></p>";
-                
-            }          
-
-}//hata parametresi varmı kontrol ediliyor
-        ?>
-</div>
-        <!-- girisBilgi div sonu-->
+    </style>
     
+                <link href="../../includes/css/yonetim.css"  type="text/css" rel="stylesheet" />
+
+    </head>
+    <body>         <div id="yonetimToolbar">
+        <ul>
+            <li><a hreF="../index.php"><img src="../../includes/img/anasayfa.png" />Anasayfa</a></li>
+            <?php do { ?>
+            <li><a href="../<?= $row_rsModulBar->ModulDizin;?>"><img src="../../uploads/modul/<?=$row_rsModulBar->ModulResim;?>"  width="24"/><?= $row_rsModulBar->ModulAdi;?></a></li>
+            <?php } while($row_rsModulBar= mysql_fetch_object($rsModulBar)); ?>
+                <li><a hreF="../../index.php"><img src="../../includes/img/logout.png" />Çıkış</a></li>
+
+        </ul>
     </div>
-    <!-- girisResim div sonu-->
- <form action="<?= $_SERVER['PHP_SELF'];?>" method="post">
-    <fieldset>
+        <h1>Stok Yönetimi Modülleri</h1>
+        <?php
+        if(isset($_GET['Islem']))
+{
+            $islem = getValues($_GET['Islem']);
+            
+            if ($islem=='ModulEkle')                 
+                echo "<p><strong>Modül Başarıyla eklendi</strong></p>"; 
+    
+            if ($islem=='ModulSil')                 
+                echo "<p><strong>Modül Başarıyla Silindi</strong></p>"; 
+            
+            
         
-        <legend>Giriş Bilgileri</legend>
-        <label for="KullaniciAdi">Kullanıcı Adı</label>
-        <input type="text" name="KullaniciAdi" id="KullanicAdi" required/>
-        <label for="Eposta">Eposta</label>
-        <input type="email" name="Eposta" id="Eposta" required/>
-        <label for="Parola">Parola</label>
-        <input type="password" name="Parola" id="Parola" required/>
-        <br>
-        <input type="submit" name="uyeGirisSubmit" value="Giriş Yap" />
+            echo "<p>Modül Sayısı $num_row_rsModul </p>";
+
+}
+        ?>
         
+        <h1>Modüller</h1>
         
-    </fieldset>
-
-
-
-</form>
-</body>
+        <?php if($num_row_rsModul!=0) :?>
+        
+        <a href="ekle.php">Modül Ekle</a>
+        <table id="ModulListe">
+            <tr>
+                <th>Modül Adı</th>    
+                <th> Dizin</th>    
+                <th> Resim</th>    
+                <th> Seviye</th>    
+                <th> Sıra</th>    
+                <th> Aktif</th>    
+              <!--  <th> Ekleme Tarih</th>    -->
+                <th>Düzenle</th>    
+                
+            </tr>
+            <?php do { ?>
+            <tr class="listeVeri">
+                <td><?= $row_rsModul->ModulAdi;?></td>
+                <td><?= $row_rsModul->ModulDizin;?></td>
+                <td><img src="../../uploads/modul/<?= $row_rsModul->ModulResim;?>" width="50"/></td>
+                <td><?= $row_rsModul->ModulSeviye;?></td>
+                <td>
+                
+       
+                    <a href="sirala.php?ModulID=<?= $row_rsModul->ModulID;?>&Islem=Artir&Sira=<?=$row_rsModul->ModulSira;?>">    <img src="../../includes/img/azalt_k.png"/></a>
+                    
+                    <?= $row_rsModul->ModulSira;?>
+                    
+                     <a href="sirala.php?ModulID=<?= $row_rsModul->ModulID;?>&Islem=Azalt&Sira=<?=$row_rsModul->ModulSira;?>">    <img src="../../includes/img/artir_k.png"/></a>
+           
+                </td>
+                <td><?php  if( $row_rsModul->ModulAktif==1)  { echo "<a href='aktiflestir.php?ModulID=$row_rsModul->ModulID&Aktif=$row_rsModul->ModulAktif'><img src='../../includes/img/_aktif.png' /></a>"; } else { echo "<a href='aktiflestir.php?ModulID=$row_rsModul->ModulID&Aktif=$row_rsModul->ModulAktif'><img src='../../includes/img/_pasif.png' /></a>"; }?></td>
+                <!--<td><?//  date("d/m/Y H:i:s", strtotime($row_rsModul->ModulEklemeTarih));?></td>-->
+                <td>
+                    
+                    <a href="duzenle.php?ModulID=<?= $row_rsModul->ModulID;?>" >Düzenle </a>
+                    
+                    | 
+                    
+                    <a href="sil.php?ModulID=<?= $row_rsModul->ModulID;?>" >Sil </a>
+                    </td>
+                
+            <?php } while($row_rsModul=mysql_fetch_object($rsModul)); ?>    
+            </tr>
+            
+        </table>
+        <?php else:?>
+        
+        <p>Henüz yüklenmiş bir modül yok</p><p><a href="ekle.php"> Modül eklemek için tıklayınız</a></p>
+        
+        <?php endif;?>
+        
+    </body>
 </html>
